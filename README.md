@@ -1,5 +1,7 @@
 # ConectaEmpresa
 
+![ConectaEmpresa](conectaempresa.png)
+
 ## Sistema de Gestão de RH e Controle de Ponto
 
 O **ConectaEmpresa** é um sistema web desenvolvido para auxiliar pequenas e médias empresas na gestão de recursos humanos, funcionários e controle de ponto.
