@@ -1,0 +1,70 @@
+name: CE Modern Lockfile Persist
+
+on:
+  push:
+    branches:
+      - tooling/ce-modern-lockfile-20260904
+    paths:
+      - .github/workflows/ce-modern-lockfile-persist.yml
+
+permissions:
+  contents: write
+
+jobs:
+  persist-lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout tooling branch
+        uses: actions/checkout@v4
+        with:
+          ref: tooling/ce-modern-lockfile-20260904
+
+      - name: Setup Node 22.16.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.16.0
+          registry-url: https://registry.npmjs.org
+
+      - name: Generate validated lockfile
+        working-directory: tools/ce-modern-lockfile
+        env:
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+          NPM_CONFIG_AUDIT: "false"
+          NPM_CONFIG_FUND: "false"
+          NPM_CONFIG_IGNORE_SCRIPTS: "true"
+        run: |
+          test "$(npm --version)" = "10.9.2"
+          sha256sum package.json > /tmp/package-json.before.sha256
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
+          sha256sum package.json > /tmp/package-json.after.sha256
+          diff -u /tmp/package-json.before.sha256 /tmp/package-json.after.sha256
+          node - <<'NODE'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json','utf8'));
+          const stable = x => JSON.stringify(Object.fromEntries(Object.entries(x || {}).sort(([a],[b]) => a.localeCompare(b))));
+          if (lock.lockfileVersion < 3) throw new Error('invalid lockfileVersion');
+          const root = lock.packages && lock.packages[''];
+          if (!root) throw new Error('root missing');
+          if (stable(root.dependencies) !== stable(pkg.dependencies)) throw new Error('dependencies mismatch');
+          if (stable(root.devDependencies) !== stable(pkg.devDependencies)) throw new Error('devDependencies mismatch');
+          for (const [path, entry] of Object.entries(lock.packages || {})) {
+            if (!path) continue;
+            if (!path.startsWith('node_modules/')) throw new Error(`unexpected path: ${path}`);
+            if (entry.link === true || entry.inBundle === true) throw new Error(`link/bundle forbidden: ${path}`);
+            const u = new URL(entry.resolved);
+            if (u.protocol !== 'https:' || u.origin !== 'https://registry.npmjs.org') throw new Error(`registry forbidden: ${path}`);
+            if (typeof entry.integrity !== 'string' || entry.integrity.length < 21) throw new Error(`integrity missing: ${path}`);
+          }
+          NODE
+          sha256sum package-lock.json
+
+      - name: Commit lockfile only to tooling branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/ce-modern-lockfile/package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m "tooling: persist validated modern package lock"
+          git push origin HEAD:tooling/ce-modern-lockfile-20260904
