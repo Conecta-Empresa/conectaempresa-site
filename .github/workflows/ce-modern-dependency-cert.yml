@@ -1,0 +1,54 @@
+name: CE Modern Dependency Cert
+
+on:
+  push:
+    branches:
+      - tooling/ce-modern-lockfile-20260904
+    paths:
+      - tools/ce-modern-lockfile/materialize-canonical.js
+      - .github/workflows/ce-modern-dependency-cert.yml
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-cert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tools/ce-modern-lockfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22.16.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.16.0
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify npm
+        run: test "$(npm --version)" = "10.9.2"
+
+      - name: Remove branch copy and materialize canonical lockfile
+        run: |
+          rm -f package-lock.json
+          node materialize-canonical.js
+          test "$(sha256sum package-lock.json | awk '{print $1}')" = "8531343bf0262c3d287ace151c6e4ff848b3fc17ecf9d0c22d156ff331ba06f3"
+
+      - name: Clean install without lifecycle scripts
+        env:
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+          NPM_CONFIG_AUDIT: "false"
+          NPM_CONFIG_FUND: "false"
+          NPM_CONFIG_IGNORE_SCRIPTS: "true"
+        run: npm ci --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
+
+      - name: Verify installed dependency graph
+        run: npm ls --all
+
+      - name: Audit full dependency graph for high or critical vulnerabilities
+        env:
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+        run: npm audit --audit-level=high --registry=https://registry.npmjs.org
