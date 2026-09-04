@@ -5,11 +5,11 @@ const fs = require('fs');
 const https = require('https');
 const path = require('path');
 
-const SOURCE = new URL('https://raw.githubusercontent.com/Conecta-Empresa/conectaempresa-site/0d6f8f3f1ffb8c20fef363ba8e95192ddfc27205/tools/ce-modern-lockfile/package-lock.json');
-const EXPECTED_PACKAGE_JSON_GIT_BLOB = 'ee16297830ebde97687520178ff82282a63bc648';
-const EXPECTED_LOCK_SHA256 = '8531343bf0262c3d287ace151c6e4ff848b3fc17ecf9d0c22d156ff331ba06f3';
-const EXPECTED_LOCK_GIT_BLOB = '05c3fc84d6a04c60ddb9d65cd23899f59e8974fb';
-const EXPECTED_LOCK_SIZE = 166806;
+const SOURCE = new URL('https://raw.githubusercontent.com/Conecta-Empresa/conectaempresa-site/eb9bb3c22116d363a384a8093b3b1eae28cd3785/tools/ce-modern-lockfile/package-lock.json');
+const EXPECTED_PACKAGE_JSON_GIT_BLOB = '3a8bda5646651006b60ff999ab53278e0c57e55a';
+const EXPECTED_LOCK_SHA256 = 'a8487cfedbe6a41114709d769f1cae7b5ce359e5256ac365f2c7223f6f125338';
+const EXPECTED_LOCK_GIT_BLOB = '8ba6269dbc7bb762b21eeb850cda0205175a2a4a';
+const EXPECTED_LOCK_SIZE = 165732;
 const MAX_DOWNLOAD_BYTES = 1024 * 1024;
 const OUTPUT = path.resolve('package-lock.json');
 
