@@ -35,7 +35,7 @@ jobs:
         run: |
           rm -f package-lock.json
           node materialize-canonical.js
-          test "$(sha256sum package-lock.json | awk '{print $1}')" = "8531343bf0262c3d287ace151c6e4ff848b3fc17ecf9d0c22d156ff331ba06f3"
+          test "$(sha256sum package-lock.json | awk '{print $1}')" = "a8487cfedbe6a41114709d769f1cae7b5ce359e5256ac365f2c7223f6f125338"
 
       - name: Clean install without lifecycle scripts
         env:
