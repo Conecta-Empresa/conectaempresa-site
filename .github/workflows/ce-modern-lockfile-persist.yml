@@ -5,6 +5,7 @@ on:
     branches:
       - tooling/ce-modern-lockfile-20260904
     paths:
+      - tools/ce-modern-lockfile/package.json
       - .github/workflows/ce-modern-lockfile-persist.yml
 
 permissions:
@@ -14,6 +15,9 @@ jobs:
   persist-lockfile:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    concurrency:
+      group: ce-modern-lockfile-persist
+      cancel-in-progress: false
     steps:
       - name: Checkout tooling branch
         uses: actions/checkout@v4
