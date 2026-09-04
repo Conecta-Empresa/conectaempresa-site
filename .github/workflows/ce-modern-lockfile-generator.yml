@@ -1,0 +1,85 @@
+name: CE Modern Lockfile Generator
+
+on:
+  push:
+    branches:
+      - tooling/ce-modern-lockfile-20260904
+    paths:
+      - tools/ce-modern-lockfile/package.json
+      - .github/workflows/ce-modern-lockfile-generator.yml
+
+permissions:
+  contents: read
+
+jobs:
+  generate-lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools/ce-modern-lockfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22.16.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.16.0
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify toolchain
+        run: |
+          node --version
+          npm --version
+          test "$(npm --version)" = "10.9.2"
+
+      - name: Record manifest hash
+        run: sha256sum package.json > package-json.before.sha256
+
+      - name: Generate lockfile with official npm registry
+        env:
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+          NPM_CONFIG_AUDIT: "false"
+          NPM_CONFIG_FUND: "false"
+          NPM_CONFIG_IGNORE_SCRIPTS: "true"
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
+
+      - name: Verify manifest unchanged
+        run: |
+          sha256sum package.json > package-json.after.sha256
+          diff -u package-json.before.sha256 package-json.after.sha256
+
+      - name: Validate generated lockfile
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json','utf8'));
+          if (!Number.isInteger(lock.lockfileVersion) || lock.lockfileVersion < 3) throw new Error('lockfileVersion < 3');
+          const root = lock.packages && lock.packages[''];
+          if (!root) throw new Error('root package entry missing');
+          const stable = (x) => JSON.stringify(Object.fromEntries(Object.entries(x || {}).sort(([a],[b]) => a.localeCompare(b))));
+          if (stable(root.dependencies) !== stable(pkg.dependencies)) throw new Error('runtime dependencies mismatch');
+          if (stable(root.devDependencies) !== stable(pkg.devDependencies)) throw new Error('devDependencies mismatch');
+          for (const [path, entry] of Object.entries(lock.packages || {})) {
+            if (!path) continue;
+            if (!path.startsWith('node_modules/')) throw new Error(`unexpected package path: ${path}`);
+            if (entry.link === true || entry.inBundle === true) throw new Error(`link/bundled package forbidden: ${path}`);
+            if (!entry.resolved) throw new Error(`resolved URL missing: ${path}`);
+            const url = new URL(entry.resolved);
+            if (url.protocol !== 'https:' || url.origin !== 'https://registry.npmjs.org') throw new Error(`unapproved registry: ${path}`);
+            if (typeof entry.integrity !== 'string' || entry.integrity.length < 21) throw new Error(`integrity missing: ${path}`);
+          }
+          NODE
+          sha256sum package-lock.json > package-lock.sha256
+
+      - name: Upload lockfile artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ce-modern-package-lock
+          path: |
+            tools/ce-modern-lockfile/package-lock.json
+            tools/ce-modern-lockfile/package-lock.sha256
+          if-no-files-found: error
+          retention-days: 1
